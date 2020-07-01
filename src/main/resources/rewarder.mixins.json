@@ -1,12 +1,10 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "net.fabricmc.example.mixin",
+  "package": "com.thatgamerblue.fabric.rewarder.mixins",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
-  ],
-  "client": [
-    "ExampleMixin"
+    "PlayerManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
