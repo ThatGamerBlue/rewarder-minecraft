@@ -38,8 +38,11 @@ dependencies {
 	testAnnotationProcessor "org.projectlombok:lombok:${project.lombok_version}"
 
 	compile "org.apache.httpcomponents:httpasyncclient:4.1.4"
+
 	include "org.apache.httpcomponents:httpasyncclient:4.1.4"
 	include "org.apache.httpcomponents:httpcore-nio:4.4.10"
+	include "org.apache.httpcomponents:httpclient:4.5.6"
+	include "org.apache.httpcomponents:httpcore:4.4.10"
 }
 
 def tokenSet = [

@@ -24,13 +24,22 @@ import com.thatgamerblue.fabric.rewarder.api.rewards.SerializedReward;
 import com.thatgamerblue.fabric.rewarder.api.sources.RewardSource;
 import java.io.IOException;
 import java.nio.CharBuffer;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.UUID;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import lombok.extern.log4j.Log4j2;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.MinecraftServer;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.apache.http.nio.IOControl;
@@ -46,18 +55,46 @@ public class StreamlootsSource extends RewardSource
 	private String apiKey;
 	private long connectAt;
 	private StreamlootsConfig config;
+	private boolean disableSsl = false;
+	private SSLContext noopSslContext;
+	private boolean disabled = false;
 
 	public StreamlootsSource(RewardManager rewardManager, ConfigManager configManager, UUID player)
 	{
 		super(rewardManager, configManager, player);
 		config = configManager.getObject(player, "streamloots", StreamlootsConfig.class);
 		apiKey = null;
+		try
+		{
+			noopSslContext = SSLContext.getInstance("SSL");
+			noopSslContext.init(null, new TrustManager[]{new X509TrustManager()
+			{
+				public X509Certificate[] getAcceptedIssuers()
+				{
+					return null;
+				}
+
+				public void checkClientTrusted(X509Certificate[] certs, String authType)
+				{
+				}
+
+				public void checkServerTrusted(X509Certificate[] certs,
+					String authType)
+				{
+				}
+			}}, new SecureRandom());
+		}
+		catch (NoSuchAlgorithmException | KeyManagementException e)
+		{
+			log.error("Failed to initialize noop ssl context");
+			noopSslContext = null;
+		}
 	}
 
 	@Override
 	public boolean shouldConnect()
 	{
-		return (config.getApiKey() != null && apiKey == null) || (apiKey != null && !apiKey.equals(config.getApiKey()));
+		return (config.getApiKey() != null && apiKey == null) || (apiKey != null && !apiKey.equals(config.getApiKey())) && !disabled;
 	}
 
 	@Override
@@ -104,7 +141,25 @@ public class StreamlootsSource extends RewardSource
 			return;
 		}
 
-		httpClient = HttpAsyncClients.createDefault();
+		if (disableSsl)
+		{
+			if (noopSslContext == null)
+			{
+				log.error("noopSslContext is null, disabling streamloots integration.");
+				disabled = true;
+				return;
+			}
+
+			httpClient = HttpAsyncClients
+				.custom()
+				.setSSLContext(noopSslContext)
+				.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+				.build();
+		}
+		else
+		{
+			httpClient = HttpAsyncClients.createDefault();
+		}
 		httpClient.start();
 
 		HttpGet request = new HttpGet("https://widgets.streamloots.com/alerts/" + apiKey + "/media-stream");
@@ -175,17 +230,26 @@ public class StreamlootsSource extends RewardSource
 		{
 			public void completed(final HttpResponse response3)
 			{
-				System.out.println(request.getRequestLine() + "->" + response3.getStatusLine());
+				log.info("Connection to streamloots closed remotely, attempting reconnection in 30 seconds");
+				apiKey = null;
+				connectAt = System.currentTimeMillis() + (1000 * 30);
 			}
 
 			public void failed(final Exception ex)
 			{
-				System.out.println(request.getRequestLine() + "->" + ex);
+				log.error("Failed to connect to streamloots, see exception for details.");
+				ex.printStackTrace();
+				if (ex instanceof SSLHandshakeException)
+				{
+					log.error("Outdated java version, disabling SSL encryption.");
+					disableSsl = true;
+					apiKey = null;
+				}
 			}
 
 			public void cancelled()
 			{
-				System.out.println(request.getRequestLine() + " cancelled");
+				// noop
 			}
 		});
 
