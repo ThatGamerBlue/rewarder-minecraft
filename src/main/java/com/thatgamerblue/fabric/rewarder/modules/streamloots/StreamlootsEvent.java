@@ -35,15 +35,14 @@ public class StreamlootsEvent
 
 	public String getSender()
 	{
-		AtomicReference<String> retn = new AtomicReference<>("");
-		data.getFields().forEach(dataField ->
+		for (StreamlootsData.StreamlootsDataField dataField : data.getFields())
 		{
 			if (dataField.getName().equals("username"))
 			{
-				retn.set(dataField.getValue());
+				return dataField.getValue();
 			}
-		});
-		return retn.get();
+		}
+		return "";
 	}
 
 	@Value
