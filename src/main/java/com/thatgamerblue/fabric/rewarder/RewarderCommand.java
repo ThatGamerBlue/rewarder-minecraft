@@ -38,9 +38,10 @@ public class RewarderCommand
 			.requires(scs -> scs.hasPermissionLevel(2))
 			.then(literal("register")
 				.then(argument("player", GameProfileArgumentType.gameProfile())
-					.executes(scs -> execute(scs.getSource(), ExecutionMode.REGISTER, GameProfileArgumentType.getProfileArgument(scs, "player")))))
+					.executes(scs -> execute(scs.getSource(), ExecutionMode.REGISTER, GameProfileArgumentType.getProfileArgument(scs, "player")))
+				)
+			)
 		);
-				//.executes(scs -> execute(scs.getSource(), StringArgumentType.getString(scs, "type"), StringArgumentType.getString(scs, "arguments"))))
 	}
 
 	private static int execute(ServerCommandSource scs, ExecutionMode toExec, Collection<GameProfile> targets)
