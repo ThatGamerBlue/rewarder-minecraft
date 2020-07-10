@@ -33,30 +33,6 @@ public class StreamlootsConfig extends Config
 {
 	private String apiKey = "";
 
-	@Getter
-	private Map<String, List<SerializedReward>> rewards = new HashMap<String, List<SerializedReward>>()
-	{{
-		put("F in chat", Lists.newArrayList(
-			new SerializedReward("message", new HashMap<String, String>()
-			{{
-				put("message", "Press F to pay respects.");
-			}}),
-			new SerializedReward("entity", new HashMap<String, String>()
-			{{
-				put("delay", "5000");
-				put("entity", "minecraft:creeper");
-			}}),
-			new SerializedReward("block", new HashMap<String, String>()
-			{{
-				put("block", "minecraft:anvil[facing=south]");
-			}}),
-			new SerializedReward("item", new HashMap<String, String>()
-			{{
-				put("item", "minecraft:iron_pickaxe{display:{Name:\"[{\\\"text\\\":\\\"Pick of Destiny\\\",\\\"italic\\\":false}]\"}}");
-			}})
-		));
-	}};
-
 	String getApiKey()
 	{
 		return apiKey.equals("useenvvar") ? System.getenv("apikey") : apiKey;

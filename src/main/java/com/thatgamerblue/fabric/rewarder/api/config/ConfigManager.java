@@ -29,6 +29,7 @@ import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.google.gson.reflect.TypeToken;
 import com.thatgamerblue.fabric.rewarder.RewarderMod;
+import com.thatgamerblue.fabric.rewarder.api.rewards.SerializedReward;
 import com.thatgamerblue.fabric.rewarder.events.PlayerConnectCallback;
 import java.io.File;
 import java.io.FileReader;
@@ -37,7 +38,9 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import net.fabricmc.loader.api.FabricLoader;
@@ -51,6 +54,8 @@ public class ConfigManager
 		.setPrettyPrinting()
 		.registerTypeHierarchyAdapter(Config.class, new InterfaceAdapter<Config>())
 		.registerTypeAdapter(UUID.class, new UUIDAdapter())
+		// must be lenient because users
+		.setLenient()
 		.disableHtmlEscaping().create();
 	private final Map<UUID, Map<String, Config>> playerConfigMap;
 	private final RewarderMod modInst;
@@ -130,7 +135,17 @@ public class ConfigManager
 				}
 			}
 
-			return (T) configMap.get(key);
+			// strip null rewards out of the config object because of a gson bug
+			T conf = (T) configMap.get(key);
+			for (Map.Entry<String, List<SerializedReward>> entry : conf.getRewards().entrySet())
+			{
+				List<SerializedReward> rewards = entry.getValue();
+				rewards.removeIf(Objects::isNull);
+				// maybe this is unneeded? not sure
+				entry.setValue(rewards);
+			}
+
+			return conf;
 		}
 		finally
 		{
@@ -153,14 +168,6 @@ public class ConfigManager
 		{
 			log.error("Failed to write config file, you may lose data!");
 			e.printStackTrace();
-		}
-	}
-
-	private void initializeSavedPlayers()
-	{
-		for (Map.Entry<UUID, Map<String, Config>> entry : playerConfigMap.entrySet())
-		{
-			modInst.getRewardManager().initializePlayer(entry.getKey());
 		}
 	}
 

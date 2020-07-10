@@ -17,17 +17,41 @@
  */
 package com.thatgamerblue.fabric.rewarder.api.config;
 
+import com.google.common.collect.Lists;
+import com.thatgamerblue.fabric.rewarder.api.rewards.SerializedReward;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import lombok.Getter;
+import lombok.Setter;
+
 public abstract class Config
 {
+	@Getter
+	@Setter
 	private String _id;
 
-	public final void set_id(String s)
-	{
-		_id = s;
-	}
-
-	public final String get_id()
-	{
-		return _id;
-	}
+	@Getter
+	private Map<String, List<SerializedReward>> rewards = new HashMap<String, List<SerializedReward>>()
+	{{
+		put("F in chat", Lists.newArrayList(
+			new SerializedReward("message", new HashMap<String, String>()
+			{{
+				put("message", "Press F to pay respects.");
+			}}),
+			new SerializedReward("entity", new HashMap<String, String>()
+			{{
+				put("delay", "5000");
+				put("entity", "minecraft:creeper");
+			}}),
+			new SerializedReward("block", new HashMap<String, String>()
+			{{
+				put("block", "minecraft:anvil[facing=south]");
+			}}),
+			new SerializedReward("item", new HashMap<String, String>()
+			{{
+				put("item", "minecraft:iron_pickaxe{display:{Name:\"[{\\\"text\\\":\\\"Pick of Destiny\\\",\\\"italic\\\":false}]\"}}");
+			}})
+		));
+	}};
 }

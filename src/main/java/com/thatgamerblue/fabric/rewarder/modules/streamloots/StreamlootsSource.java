@@ -190,7 +190,7 @@ public class StreamlootsSource extends RewardSource
 				if (recvBuffer.endsWith("\n\n"))
 				{
 					String process = recvBuffer.trim();
-					log.debug("received useful data: " + process);
+					log.info("received useful data: " + process);
 					process = process.substring(process.indexOf("{")).trim();
 					StreamlootsEvent event = gson.fromJson(process, StreamlootsEvent.class);
 
