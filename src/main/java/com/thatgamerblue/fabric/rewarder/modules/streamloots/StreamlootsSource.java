@@ -17,6 +17,7 @@
  */
 package com.thatgamerblue.fabric.rewarder.modules.streamloots;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
 import com.thatgamerblue.fabric.rewarder.api.config.ConfigManager;
 import com.thatgamerblue.fabric.rewarder.api.rewards.RewardManager;
@@ -51,10 +52,12 @@ import org.apache.http.protocol.HttpContext;
 @Log4j2
 public class StreamlootsSource extends RewardSource
 {
+	private final Gson gson = new Gson();
+	private final StreamlootsConfig config;
+
 	private CloseableHttpAsyncClient httpClient;
 	private String apiKey;
 	private long connectAt;
-	private StreamlootsConfig config;
 	private boolean disableSsl = false;
 	private SSLContext noopSslContext;
 	private boolean disabled = false;
@@ -131,6 +134,25 @@ public class StreamlootsSource extends RewardSource
 		}
 	}
 
+	// TODO: write a test for this
+	@VisibleForTesting
+	public void handleReceivedEvent(String recvBuffer)
+	{
+		String process = recvBuffer.trim();
+		log.debug("received useful data: " + process);
+		process = process.substring(process.indexOf("{")).trim();
+		StreamlootsEvent event = gson.fromJson(process, StreamlootsEvent.class);
+
+		if (event.getData().getType().equals("redemption"))
+		{
+			if (config.getRewards().containsKey(event.getCardName()))
+			{
+				List<SerializedReward> rewards = config.getRewards().get(event.getCardName());
+				rewards.stream().map(rewardManager::deserializeReward).forEach(r -> rewardManager.queueReward(player, r));
+			}
+		}
+	}
+
 	private void actualConnect() throws IOException
 	{
 		disconnect();
@@ -171,7 +193,6 @@ public class StreamlootsSource extends RewardSource
 		{
 			private HttpResponse response;
 			private String recvBuffer;
-			private final Gson gson = new Gson();
 
 			@Override
 			protected void onResponseReceived(final HttpResponse response)
@@ -189,19 +210,7 @@ public class StreamlootsSource extends RewardSource
 
 				if (recvBuffer.endsWith("\n\n"))
 				{
-					String process = recvBuffer.trim();
-					log.info("received useful data: " + process);
-					process = process.substring(process.indexOf("{")).trim();
-					StreamlootsEvent event = gson.fromJson(process, StreamlootsEvent.class);
-
-					if (event.getData().getType().equals("redemption"))
-					{
-						if (config.getRewards().containsKey(event.getCardName()))
-						{
-							List<SerializedReward> rewards = config.getRewards().get(event.getCardName());
-							rewards.stream().map(rewardManager::deserializeReward).forEach(r -> rewardManager.queueReward(player, r));
-						}
-					}
+					handleReceivedEvent(recvBuffer);
 
 					recvBuffer = "";
 				}

@@ -17,6 +17,7 @@
  */
 package com.thatgamerblue.fabric.rewarder.api.rewards;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.thatgamerblue.fabric.rewarder.RewarderMod;
 import com.thatgamerblue.fabric.rewarder.api.config.ConfigManager;
 import com.thatgamerblue.fabric.rewarder.api.sources.RewardSource;
@@ -72,50 +73,33 @@ public class RewardManager
 
 	public void deregisterRewardSource(Class<? extends RewardSource> rewardSource)
 	{
-		for (Iterator<Map.Entry<UUID, List<RewardSource>>> iterator = activeRewardSources.entrySet().iterator(); iterator.hasNext(); )
+		synchronized (activeRewardSources)
 		{
-			Map.Entry<UUID, List<RewardSource>> entry = iterator.next();
-			List<RewardSource> v = entry.getValue();
-			for (RewardSource rs : v)
+			for (Iterator<Map.Entry<UUID, List<RewardSource>>> iterator = activeRewardSources.entrySet().iterator(); iterator.hasNext(); )
 			{
-				if (rs.getClass().equals(rewardSource))
+				Map.Entry<UUID, List<RewardSource>> entry = iterator.next();
+				List<RewardSource> v = entry.getValue();
+				for (RewardSource rs : v)
 				{
-					try
+					if (rs.getClass().equals(rewardSource))
 					{
-						rs.disconnect();
-					}
-					catch (IOException e)
-					{
-						log.error("Failed to disconnect from reward source " + v.getClass().getSimpleName() + "!");
-						e.printStackTrace();
-					}
-					finally
-					{
-						iterator.remove();
+						try
+						{
+							rs.disconnect();
+						}
+						catch (IOException e)
+						{
+							log.error("Failed to disconnect from reward source " + v.getClass().getSimpleName() + "!");
+							e.printStackTrace();
+						}
+						finally
+						{
+							iterator.remove();
+						}
 					}
 				}
 			}
 		}
-	}
-
-	public void initializePlayer(UUID uuid)
-	{
-		if (activeRewardSources.containsKey(uuid))
-		{
-			// player is already initialized
-			return;
-		}
-
-		PriorityBlockingQueue<Reward> rewardQueue = createRewardQueue();
-		List<RewardSource> rewardSources = new ArrayList<>();
-
-		synchronized (rewardSourceRegistry)
-		{
-			rewardSourceRegistry.forEach(r -> rewardSources.add(instantiateRewardSource(r, uuid)));
-		}
-
-		activeRewardSources.put(uuid, rewardSources);
-		playerRewardQueues.put(uuid, rewardQueue);
 	}
 
 	private RewardSource instantiateRewardSource(Class<? extends RewardSource> clazz, UUID uuid)
@@ -132,9 +116,19 @@ public class RewardManager
 		return new NoopSource(this, modInst.getConfigManager(), uuid);
 	}
 
-	private PriorityBlockingQueue<Reward> createRewardQueue()
+	public <T extends RewardSource> T getRewardSource(Class<T> clazz, UUID player)
 	{
-		return new PriorityBlockingQueue<>(16, (o1, o2) -> Boolean.compare(o1.canExecute(), o2.canExecute()));
+		synchronized (activeRewardSources)
+		{
+			List<RewardSource> sources = activeRewardSources.get(player);
+
+			if (sources == null)
+			{
+				return null;
+			}
+
+			return (T) sources.stream().filter(o -> o.getClass() == clazz).findFirst().orElseGet(null);
+		}
 	}
 	//endregion
 
@@ -179,6 +173,38 @@ public class RewardManager
 		}
 
 		playerRewardQueues.get(uuid).add(reward);
+	}
+
+	public void initializePlayer(UUID uuid)
+	{
+		synchronized (activeRewardSources)
+		{
+			if (activeRewardSources.containsKey(uuid))
+			{
+				// player is already initialized
+				return;
+			}
+		}
+
+		PriorityBlockingQueue<Reward> rewardQueue = createRewardQueue();
+		List<RewardSource> rewardSources = new ArrayList<>();
+
+		synchronized (rewardSourceRegistry)
+		{
+			rewardSourceRegistry.forEach(r -> rewardSources.add(instantiateRewardSource(r, uuid)));
+		}
+
+		activeRewardSources.put(uuid, rewardSources);
+
+		synchronized (activeRewardSources)
+		{
+			playerRewardQueues.put(uuid, rewardQueue);
+		}
+	}
+
+	private PriorityBlockingQueue<Reward> createRewardQueue()
+	{
+		return new PriorityBlockingQueue<>(16, (o1, o2) -> Boolean.compare(o1.canExecute(), o2.canExecute()));
 	}
 
 	private void tickEvents(MinecraftServer server)
@@ -235,6 +261,21 @@ public class RewardManager
 		{
 			log.error("Failed to connect to reward source " + rewardSource.getClass().getCanonicalName() + ", funky things may occur");
 			e.printStackTrace();
+		}
+	}
+
+	@VisibleForTesting
+	public int getQueueLength()
+	{
+		synchronized (activeRewardSources)
+		{
+			int i = 0;
+			for (Map.Entry<UUID, List<RewardSource>> entry : activeRewardSources.entrySet())
+			{
+				List<RewardSource> v = entry.getValue();
+				i += v.size();
+			}
+			return 1;
 		}
 	}
 }
