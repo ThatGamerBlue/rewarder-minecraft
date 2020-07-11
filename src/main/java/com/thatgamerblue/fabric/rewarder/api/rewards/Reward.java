@@ -17,11 +17,12 @@
  */
 package com.thatgamerblue.fabric.rewarder.api.rewards;
 
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 
 public interface Reward
 {
 	boolean canExecute();
 
-	void execute(ServerWorld world);
+	void execute(ServerWorld world, ServerPlayerEntity player);
 }

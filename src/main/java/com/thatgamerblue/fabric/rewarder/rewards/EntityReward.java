@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Rewarder.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.thatgamerblue.fabric.rewarder.rewards;
 
 import com.thatgamerblue.fabric.rewarder.api.rewards.RewardDeserializer;
@@ -26,6 +25,7 @@ import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.LiteralText;
 
@@ -41,7 +41,7 @@ public class EntityReward extends TimeableReward
 	}
 
 	@Override
-	public void execute(ServerWorld world)
+	public void execute(ServerWorld world, ServerPlayerEntity player)
 	{
 		// TODO: add support for nbt and player position offsets
 		Optional<EntityType<?>> entityTypeOptional = EntityType.get(entityName);
@@ -50,23 +50,20 @@ public class EntityReward extends TimeableReward
 			log.error("Entity type " + entityName + " doesn't exist. Maybe you made a typo?");
 		}
 
-		world.getPlayers().forEach(player ->
+		if (!entityTypeOptional.isPresent())
 		{
-			if (!entityTypeOptional.isPresent())
-			{
-				player.sendMessage(new LiteralText("ERROR: Entity type " + entityName + " doesn't exist"), false);
-				return;
-			}
-			Entity entity = entityTypeOptional.get().create(world);
-			if (entity == null)
-			{
-				// something very very bad has happened in the game
-				log.error("Failed spawning entity " + entityName + " for player " + player.getName().asString());
-				return;
-			}
-			entity.updatePosition(player.getX(), player.getY(), player.getZ());
-			world.spawnEntity(entity);
-		});
+			player.sendMessage(new LiteralText("ERROR: Entity type " + entityName + " doesn't exist"), false);
+			return;
+		}
+		Entity entity = entityTypeOptional.get().create(world);
+		if (entity == null)
+		{
+			// something very very bad has happened in the game
+			log.error("Failed spawning entity " + entityName + " for player " + player.getName().asString());
+			return;
+		}
+		entity.updatePosition(player.getX(), player.getY(), player.getZ());
+		world.spawnEntity(entity);
 	}
 
 	public static class Deserializer implements RewardDeserializer<EntityReward>

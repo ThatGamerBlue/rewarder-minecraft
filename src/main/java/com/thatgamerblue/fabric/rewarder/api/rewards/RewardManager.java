@@ -116,6 +116,7 @@ public class RewardManager
 		return new NoopSource(this, modInst.getConfigManager(), uuid);
 	}
 
+	@VisibleForTesting
 	public <T extends RewardSource> T getRewardSource(Class<T> clazz, UUID player)
 	{
 		synchronized (activeRewardSources)
@@ -244,7 +245,7 @@ public class RewardManager
 
 				if (reward.canExecute())
 				{
-					reward.execute(playerEntity.getServerWorld());
+					reward.execute(playerEntity.getServerWorld(), playerEntity);
 					iterator.remove();
 				}
 			}

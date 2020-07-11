@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Rewarder.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.thatgamerblue.fabric.rewarder.rewards;
 
 import com.google.common.collect.ImmutableSet;
@@ -25,31 +24,21 @@ import com.thatgamerblue.fabric.rewarder.api.rewards.RewardDeserializer;
 import com.thatgamerblue.fabric.rewarder.api.rewards.TimeableReward;
 import com.thatgamerblue.fabric.rewarder.utils.NumberUtils;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import lombok.extern.log4j.Log4j2;
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Material;
 import net.minecraft.command.arguments.BlockArgumentParser;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.LiteralText;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.registry.Registry;
 
 @Log4j2
 public class BlockReward extends TimeableReward
 {
-	private static final Set<Material> REPLACEABLE_MATERIALS = ImmutableSet.of(
-		Material.AIR,
-		Material.REPLACEABLE_PLANT,
-		Material.REPLACEABLE_UNDERWATER_PLANT,
-		Material.WATER
-	);
-
 	private final BlockState blockState;
 
 	public BlockReward(long timestamp, BlockState blockState)
@@ -59,33 +48,31 @@ public class BlockReward extends TimeableReward
 	}
 
 	@Override
-	public void execute(ServerWorld world)
+	public void execute(ServerWorld world, ServerPlayerEntity player)
 	{
-		world.getPlayers().forEach(player -> {
-			if (blockState == null)
-			{
-				player.sendMessage(new LiteralText("ERROR: Block parsed incorrectly in BlockReward! Did you make a typo?"), false);
-				return;
-			}
+		if (blockState == null)
+		{
+			player.sendMessage(new LiteralText("ERROR: Block parsed incorrectly in BlockReward! Did you make a typo?"), false);
+			return;
+		}
 
-			BlockPos pos = player.getBlockPos();
-			if (!world.canSetBlock(pos))
-			{
-				player.sendMessage(new LiteralText("You missed a " + blockState.toString() + " by being out of the world."), false);
-				return;
-			}
+		BlockPos pos = player.getBlockPos();
+		if (!world.canSetBlock(pos))
+		{
+			player.sendMessage(new LiteralText("You missed a " + blockState.toString() + " by being out of the world."), false);
+			return;
+		}
 
-			Material oldMaterial = world.getBlockState(pos).getMaterial();
-			if (REPLACEABLE_MATERIALS.contains(oldMaterial))
-			{
-				world.setBlockState(pos, blockState);
-			}
-			else
-			{
-				player.sendMessage(new LiteralText("Please place this block as soon as possible"), false);
-				world.spawnEntity(new ItemEntity(world, pos.getX(), pos.getY(), pos.getZ(), new ItemStack(blockState.getBlock().asItem(), 1)));
-			}
-		});
+		Material oldMaterial = world.getBlockState(pos).getMaterial();
+		if (oldMaterial.isReplaceable())
+		{
+			world.setBlockState(pos, blockState);
+		}
+		else
+		{
+			player.sendMessage(new LiteralText("Please place this block as soon as possible"), false);
+			world.spawnEntity(new ItemEntity(world, pos.getX(), pos.getY(), pos.getZ(), new ItemStack(blockState.getBlock().asItem(), 1)));
+		}
 	}
 
 	public static class Deserializer implements RewardDeserializer<BlockReward>

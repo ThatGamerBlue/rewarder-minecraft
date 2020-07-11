@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Rewarder.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.thatgamerblue.fabric.rewarder.rewards;
 
 import com.mojang.brigadier.StringReader;
@@ -28,6 +27,7 @@ import lombok.extern.log4j.Log4j2;
 import net.minecraft.command.arguments.ItemStackArgumentType;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.LiteralText;
 
@@ -43,17 +43,15 @@ public class ItemReward extends TimeableReward
 	}
 
 	@Override
-	public void execute(ServerWorld world)
+	public void execute(ServerWorld world, ServerPlayerEntity player)
 	{
-		world.getPlayers().forEach(player -> {
-			if (stack == null)
-			{
-				player.sendMessage(new LiteralText("ERROR: Item parsed incorrectly in ItemReward! Did you make a typo?"), false);
-				return;
-			}
+		if (stack == null)
+		{
+			player.sendMessage(new LiteralText("ERROR: Item parsed incorrectly in ItemReward! Did you make a typo?"), false);
+			return;
+		}
 
-			world.spawnEntity(new ItemEntity(world, player.getX(), player.getY(), player.getZ(), stack));
-		});
+		world.spawnEntity(new ItemEntity(world, player.getX(), player.getY(), player.getZ(), stack));
 	}
 
 	public static class Deserializer implements RewardDeserializer<ItemReward>

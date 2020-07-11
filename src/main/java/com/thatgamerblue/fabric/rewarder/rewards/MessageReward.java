@@ -21,6 +21,7 @@ import com.thatgamerblue.fabric.rewarder.api.rewards.RewardDeserializer;
 import com.thatgamerblue.fabric.rewarder.api.rewards.TimeableReward;
 import com.thatgamerblue.fabric.rewarder.utils.NumberUtils;
 import java.util.Map;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.LiteralText;
 
@@ -37,12 +38,9 @@ public class MessageReward extends TimeableReward
 	}
 
 	@Override
-	public void execute(ServerWorld world)
+	public void execute(ServerWorld world, ServerPlayerEntity player)
 	{
-		world.getPlayers().forEach(p ->
-		{
-			p.sendMessage(new LiteralText(message), actionBar);
-		});
+		player.sendMessage(new LiteralText(message), actionBar);
 	}
 
 	public static class Deserializer implements RewardDeserializer<MessageReward>
