@@ -57,8 +57,6 @@ public class RewardManager
 	{
 		this.modInst = modInst;
 
-		// TODO: make this handle dimensions
-		// make the reward queue be a Map<UUID, PriorityBlockingQueue<Reward>> where uuid is player uuid
 		ServerTickCallback.EVENT.register(this::tickEvents);
 	}
 
