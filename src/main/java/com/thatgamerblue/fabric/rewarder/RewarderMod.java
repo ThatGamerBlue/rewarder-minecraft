@@ -19,9 +19,9 @@ package com.thatgamerblue.fabric.rewarder;
 
 import com.thatgamerblue.fabric.rewarder.api.config.ConfigManager;
 import com.thatgamerblue.fabric.rewarder.api.rewards.RewardManager;
-import com.thatgamerblue.fabric.rewarder.modules.noop.NoopSource;
 import com.thatgamerblue.fabric.rewarder.modules.streamloots.StreamlootsSource;
 import com.thatgamerblue.fabric.rewarder.rewards.BlockReward;
+import com.thatgamerblue.fabric.rewarder.rewards.CommandReward;
 import com.thatgamerblue.fabric.rewarder.rewards.EntityReward;
 import com.thatgamerblue.fabric.rewarder.rewards.ItemReward;
 import com.thatgamerblue.fabric.rewarder.rewards.MessageReward;
@@ -48,6 +48,7 @@ public class RewarderMod implements ModInitializer
 
 		rewardManager.registerRewardSource(StreamlootsSource.class);
 
+		rewardManager.registerRewardDeserializer("command", new CommandReward.Deserializer());
 		rewardManager.registerRewardDeserializer("message", new MessageReward.Deserializer());
 		rewardManager.registerRewardDeserializer("entity", new EntityReward.Deserializer());
 		rewardManager.registerRewardDeserializer("block", new BlockReward.Deserializer());
