@@ -17,53 +17,85 @@
  */
 package com.thatgamerblue.fabric.rewarder.rewards;
 
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.thatgamerblue.fabric.rewarder.api.rewards.RewardDeserializer;
 import com.thatgamerblue.fabric.rewarder.api.rewards.TimeableReward;
 import com.thatgamerblue.fabric.rewarder.utils.NumberUtils;
 import java.util.Map;
-import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
+import net.minecraft.command.arguments.EntitySummonArgumentType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.SpawnReason;
+import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.StringNbtReader;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.LiteralText;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.registry.Registry;
 
 @Log4j2
 public class EntityReward extends TimeableReward
 {
-	private final String entityName;
+	private final Identifier entityId;
+	private final CompoundTag nbtData;
+	private final boolean hasNbt;
 
-	public EntityReward(long timestamp, String entityName)
+	public EntityReward(long timestamp, Identifier entityId, CompoundTag tag, boolean hasNbt)
 	{
 		super(timestamp);
-		this.entityName = entityName;
+		this.entityId = entityId;
+		this.nbtData = tag;
+		this.hasNbt = hasNbt;
 	}
 
 	@Override
 	public void execute(ServerWorld world, ServerPlayerEntity player)
 	{
-		// TODO: add support for nbt and player position offsets
-		Optional<EntityType<?>> entityTypeOptional = EntityType.get(entityName);
-		if (!entityTypeOptional.isPresent())
+		// TODO: add support for player position offsets
+		String entityIdString = entityId.toString();
+		if (entityIdString.startsWith("rewarder:"))
 		{
-			log.error("Entity type " + entityName + " doesn't exist. Maybe you made a typo?");
+			boolean missing = entityIdString.contains("missing");
+			player.sendMessage(new LiteralText("ERROR: Entity ID is " + (missing ? "missing" : "invalid (" + entityIdString + ")") + ", please check your config"), false);
+			return;
 		}
 
-		if (!entityTypeOptional.isPresent())
+		CompoundTag finalNbt = nbtData.copy();
+		finalNbt.putString("id", entityId.toString());
+		Entity entity = EntityType.loadEntityWithPassengers(finalNbt, world, (ent) ->
 		{
-			player.sendMessage(new LiteralText("ERROR: Entity type " + entityName + " doesn't exist"), false);
-			return;
-		}
-		Entity entity = entityTypeOptional.get().create(world);
+			ent.refreshPositionAndAngles(player.getBlockPos(), ent.getYaw(1.0f), ent.getPitch(1.0f));
+			return world.tryLoadEntity(ent) ? ent : null;
+		});
+
 		if (entity == null)
 		{
-			// something very very bad has happened in the game
-			log.error("Failed spawning entity " + entityName + " for player " + player.getName().asString());
+			player.sendMessage(new LiteralText("ERROR: Failed to spawn entity: " + entityIdString), false);
 			return;
 		}
-		entity.updatePosition(player.getX(), player.getY(), player.getZ());
-		world.spawnEntity(entity);
+
+		if (hasNbt && entity instanceof MobEntity)
+		{
+			((MobEntity) entity).initialize(world, world.getLocalDifficulty(entity.getBlockPos()), SpawnReason.TRIGGERED, null, null);
+		}
+	}
+
+	static class EntitySpawnArgumentType
+	{
+		private static Identifier validate(Identifier identifier) throws CommandSyntaxException
+		{
+			Registry.ENTITY_TYPE.getOrEmpty(identifier).orElseThrow(() -> EntitySummonArgumentType.NOT_FOUND_EXCEPTION.create(identifier));
+			return identifier;
+		}
+
+		public static Identifier parse(String string) throws CommandSyntaxException
+		{
+			return validate(Identifier.fromCommandInput(new StringReader(string)));
+		}
 	}
 
 	public static class Deserializer implements RewardDeserializer<EntityReward>
@@ -71,12 +103,40 @@ public class EntityReward extends TimeableReward
 		@Override
 		public EntityReward deserialize(Map<String, String> data)
 		{
-			// TODO: implement deserializer from summon command or find a better way to do nbt
+			// deserialize time
 			long offset = data.containsKey("delay") ? NumberUtils.parseLongSafe(data.get("delay")) : 0;
 			long timestamp = offset + System.currentTimeMillis();
-			String entityId = data.getOrDefault("entity", "MISSING ENTITY ID");
 
-			return new EntityReward(timestamp, entityId);
+			// deserialize entity id
+			String entityId = data.getOrDefault("entity", "");
+			Identifier identifier;
+			try
+			{
+				identifier = EntitySpawnArgumentType.parse(entityId);
+			}
+			catch (CommandSyntaxException e)
+			{
+				log.error("Failed to parse entity ID, will error when executed");
+				e.printStackTrace();
+				identifier = new Identifier(entityId.isEmpty() ? "rewarder:missing_entity_id" : "rewarder:invalid_entity_id");
+			}
+
+			// deserialize nbt
+			String serializedNbt = data.getOrDefault("nbt", "{}");
+			CompoundTag nbtTag;
+			boolean hasNbt = false;
+			try
+			{
+				nbtTag = new StringNbtReader(new StringReader(serializedNbt)).parseCompoundTag();
+				hasNbt = true;
+			}
+			catch (CommandSyntaxException e)
+			{
+				log.error("Failed to parse NBT Compound tag, resetting to default");
+				e.printStackTrace();
+				nbtTag = new CompoundTag();
+			}
+			return new EntityReward(timestamp, identifier, nbtTag, hasNbt);
 		}
 	}
 }

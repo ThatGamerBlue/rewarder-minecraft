@@ -43,6 +43,7 @@ public abstract class Config
 			{{
 				put("delay", "5000");
 				put("entity", "minecraft:creeper");
+				put("nbt", "{CustomName:\"\\\"SSSsss\\\"\"}");
 			}}),
 			new SerializedReward("block", new HashMap<String, String>()
 			{{
